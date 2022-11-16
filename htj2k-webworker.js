@@ -1,28 +1,30 @@
 self.importScripts('openjphjs.js');
-console.log('worker started')
+//console.log('worker started')
 
 let decoder
 
-let queue = []
+let queuedTasks = []
 
 Module.onRuntimeInitialized = async _ => {
-    console.log('HTJ2K Initialized')
+    //console.log('HTJ2K Initialized')
     decoder = new Module.HTJ2KDecoder();
-    //postMessage({initialized: true})
 
-    const queuedJobs = queue
-    queue = []
-    queuedJobs.forEach((d) => {
-        decode(d)
+    // process any queued jobs
+    const tasks = queuedTasks
+    queuedTasks = []
+    tasks.forEach((task) => {
+        decode(task)
     })
 }
 
-function decode(encodedBitStream) {
-    console.log('decode',encodedBitStream )
+function decode(task) {
+
+    //console.log('decode',encodedBitStream )
 
     // Setup
-    const encodedBuffer = decoder.getEncodedBuffer(encodedBitStream.length);
-    encodedBuffer.set(encodedBitStream);
+    const startDecode = new Date()
+    const encodedBuffer = decoder.getEncodedBuffer(task.data.length);
+    encodedBuffer.set(task.data);
 
     // Get header
     decoder.readHeader();
@@ -35,21 +37,44 @@ function decode(encodedBitStream) {
     // Display Image
     var decodedBuffer = decoder.getDecodedBuffer();
 
-    const decodedBufferCopy = decodedBuffer.slice()
-
-    postMessage([decodedBufferCopy.buffer, frameInfo]);
+    // Convert decoded pixel data to an ImageData object
+    const numPixels = frameInfo.width * frameInfo.height
+    const u8c = new Uint8ClampedArray(numPixels * 4)
+    for(z = 0; z < numPixels; z++) {
+        u8c[z * 4] = decodedBuffer[z *3]
+        u8c[z * 4 + 1] = decodedBuffer[z *3 + 1]
+        u8c[z * 4 + 2] = decodedBuffer[z *3 + 2]
+        u8c[z * 4 + 3] = 255
+    }
+    const imgData = new ImageData(u8c, frameInfo.width, frameInfo.height);
+    const endDecode = new Date()
+    const decodeDuration = endDecode - startDecode
+    postMessage([imgData, frameInfo, task.requestId, task.fetchDuration, decodeDuration]);
 }
 
 
 onmessage = function(e) {
-    console.log('Message received from main script', e.data);
+    //console.log('Message received from main script', e.data);
     
-    if(decoder === undefined) {
-        console.log('HTJ2K not initilized yet, queueing')
-        queue.push(new Uint8Array(e.data[0]))
-        return
-    }
+    const startFetch = new Date()
 
-    const encodedBitStream = new Uint8Array(e.data[0])
-    decode(encodedBitStream)
+    fetch(e.data.src).then((res) => {
+        return res.arrayBuffer()
+    }).then((res) => {
+        const endFetch = new Date()
+        const fetchDuration = endFetch - startFetch
+
+        const task = {
+            data: new Uint8Array(res),
+            requestId: e.data.requestId,
+            fetchDuration
+        }
+
+        if(decoder === undefined) {
+            //console.log('HTJ2K not initilized yet, queueing')
+            queuedTasks.push(task)
+        } else {
+            decode(task)
+        }
+    })
   }
