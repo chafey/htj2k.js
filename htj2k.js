@@ -2,13 +2,14 @@
     //console.log('starting worker')
    
     const requestMap = {}
-    let nextRequest = 0
+    let nextRequest = 1
 
     const worker = new Worker('htj2k-webworker.js');
     worker.onmessage = (e) => {
         const imgData = e.data[0]
         const frameInfo = e.data[1]
-        req = requestMap[e.data[2]]
+        const requestId = e.data[2]
+        const req = requestMap[requestId]
         const fetchDuration = e.data[3]
         const decodeDuration = e.data[4]
         //console.log('Fetch', fetchDuration, 'Decode', decodeDuration)
@@ -25,18 +26,17 @@
     }
   
     async function imgDataToCanvas(img, imgData) {
-      //console.log('imgData', imgData)
       const canvas = document.createElement('canvas');
       canvas.width = img.width === 1 ? imgData.width : img.width;
       canvas.height = img.height === 1 ? imgData.height : img.height;
       const imgBitmap = await window.createImageBitmap(imgData, {resizeWidth: canvas.width, resizeHeight: canvas.height});
       canvas.getContext('2d').drawImage(imgBitmap, 0, 0);
-      img.src = canvas.toDataURL();
+      const dataUrl = canvas.toDataURL()
+      img.src = dataUrl
       // TODO: delete canvas
     }
   
-    async function decode(img, isCSS) {
-      //console.log('decode' , img)
+    function decode(img, isCSS) {
       const src = isCSS ? getComputedStyle(img).backgroundImage.slice(5, -2) : img.currentSrc;
       img.src = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='; // blank 1x1 image
       const requestId = nextRequest++
