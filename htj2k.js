@@ -37,12 +37,14 @@
     }
   
     function decode(img, isCSS) {
-      const src = isCSS ? getComputedStyle(img).backgroundImage.slice(5, -2) : img.currentSrc;
-      img.src = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='; // blank 1x1 image
-      const requestId = nextRequest++
-      requestMap[requestId] = {
-        img,isCSS}
-      worker.postMessage({src, requestId});
+        const src = isCSS ? getComputedStyle(img).backgroundImage.slice(5, -2) : img.currentSrc;
+        img.src = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='; // blank 1x1 image
+        const requestId = nextRequest++
+        requestMap[requestId] = {
+            img,
+            isCSS
+        }
+        worker.postMessage({src, requestId});
     }
   
     new MutationObserver(mutations => {
